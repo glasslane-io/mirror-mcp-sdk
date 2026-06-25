@@ -2,15 +2,27 @@
 CLI for mirror-mcp client
 
 Usage:
-    mirror-mcp health                           # Check server health
-    mirror-mcp list-skills                      # List all available skills
-    mirror-mcp list-skills --category defi      # List DeFi skills
-    mirror-mcp search risk                        # Search skills
-    mirror-mcp skill analyze_defi_protocol_risk   # Show skill details
-    mirror-mcp categories                         # List categories
-    mirror-mcp permissions                      # Show key permissions
+    # Server health
+    mirror-mcp health
     
-    mirror-mcp --api-key gl_mcp_... list-skills   # Use specific API key
+    # List tools (100+ executable tools)
+    mirror-mcp tools
+    mirror-mcp tools --category market
+    
+    # Execute tools
+    mirror-mcp call get_symbol_price '{"symbol": "BTC"}'
+    mirror-mcp call get_current_market_data
+    
+    # Legacy skill commands (still work)
+    mirror-mcp list-skills
+    mirror-mcp list-skills --category defi
+    mirror-mcp skill analyze_defi_protocol_risk
+    mirror-mcp permissions
+    
+    # With explicit API key
+    mirror-mcp --api-key gl_mcp_... tools
+
+Get your API key at: https://mirror.glasslane.io
 """
 
 import os
@@ -62,8 +74,66 @@ def cmd_health(args):
         return 1
 
 
+def cmd_tools(args):
+    """List available executable tools"""
+    from mirror_mcp import MirrorMCPClient
+    
+    api_key = resolve_api_key(args)
+    
+    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
+        tools = client.list_tools()
+        
+        if args.category:
+            tools = [t for t in tools if t.get("category") == args.category]
+            print(f"Tools in category '{args.category}' ({len(tools)} total):\n")
+        else:
+            print(f"Available tools ({len(tools)} total):\n")
+        
+        # Group by category
+        from collections import defaultdict
+        by_category = defaultdict(list)
+        for tool in tools:
+            by_category[tool.get("category", "other")].append(tool)
+        
+        for category in sorted(by_category.keys()):
+            cat_tools = by_category[category]
+            print(f"\n{category.upper()} ({len(cat_tools)} tools):")
+            for tool in cat_tools:
+                desc = tool.get("description", "")[:60]
+                if len(tool.get("description", "")) > 60:
+                    desc += "..."
+                print(f"  • {tool['name']}")
+                print(f"    {desc}")
+
+
+def cmd_call(args):
+    """Execute any tool via REST API"""
+    from mirror_mcp import MirrorMCPClient
+    
+    api_key = resolve_api_key(args)
+    
+    # Parse arguments
+    try:
+        if args.arguments:
+            arguments = json.loads(args.arguments)
+        else:
+            arguments = {}
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON arguments - {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
+        try:
+            result = client.execute_tool(args.tool_name, arguments)
+            print(json.dumps(result, indent=2))
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+
+# Legacy commands for backwards compatibility
 def cmd_list_skills(args):
-    """List available skills"""
+    """List available skills (legacy)"""
     from mirror_mcp import MirrorMCPClient
     
     api_key = resolve_api_key(args)
@@ -88,30 +158,8 @@ def cmd_list_skills(args):
             print()
 
 
-def cmd_search(args):
-    """Search for skills"""
-    from mirror_mcp import MirrorMCPClient
-    
-    api_key = resolve_api_key(args)
-    
-    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
-        skills = client.search_skills(args.query)
-        
-        print(f"Search results for '{args.query}' ({len(skills)} matches):\n")
-        
-        for skill in skills:
-            print(f"  {skill.name}")
-            print(f"    Title: {skill.title}")
-            print(f"    Category: {skill.category}")
-            desc = skill.description
-            if len(desc) > 80:
-                desc = desc[:77] + "..."
-            print(f"    {desc}")
-            print()
-
-
 def cmd_skill(args):
-    """Show skill details"""
+    """Show skill details (legacy)"""
     from mirror_mcp import MirrorMCPClient
     
     api_key = resolve_api_key(args)
@@ -129,24 +177,6 @@ def cmd_skill(args):
         print(f"\nDescription:")
         print(f"  {skill.description}")
         print(f"\nTags: {', '.join(skill.tags)}")
-
-
-def cmd_categories(args):
-    """List skill categories"""
-    from mirror_mcp import MirrorMCPClient
-    
-    api_key = resolve_api_key(args)
-    
-    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
-        categories = client.get_categories()
-        
-        print(f"Skill categories ({len(categories)} total):\n")
-        
-        for key, cat in categories.items():
-            print(f"  {cat.icon} {cat.name}")
-            print(f"    Key: {key}")
-            print(f"    {cat.description}")
-            print()
 
 
 def cmd_permissions(args):
@@ -167,67 +197,39 @@ def cmd_permissions(args):
         print(f"\nTable Access: {', '.join(perms.tables) if perms.tables else 'None'}")
 
 
-def cmd_call(args):
-    """Call a tool (placeholder - returns skill metadata)"""
-    from mirror_mcp import MirrorMCPClient
-    
-    api_key = resolve_api_key(args)
-    
-    # Parse arguments
-    try:
-        if args.arguments:
-            arguments = json.loads(args.arguments)
-        else:
-            arguments = {}
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON arguments - {e}", file=sys.stderr)
-        sys.exit(1)
-    
-    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
-        try:
-            result = client.call_tool(args.tool_name, arguments)
-            print(json.dumps(result, indent=2))
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-
-def cmd_generate(args):
-    """Generate a prompt from a skill"""
-    from mirror_mcp import MirrorMCPClient
-    
-    api_key = resolve_api_key(args)
-    
-    # Parse parameters
-    params = {}
-    for param in args.param or []:
-        if '=' in param:
-            key, value = param.split('=', 1)
-            params[key] = value
-    
-    with MirrorMCPClient(api_key=api_key, base_url=args.base_url) as client:
-        try:
-            prompt = client.generate_prompt(args.skill_name, **params)
-            print(prompt)
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-
 def main():
     parser = argparse.ArgumentParser(
         prog="mirror-mcp",
-        description="Mirror AI MCP Client — Connect to hosted crypto intelligence tools",
+        description="Mirror AI MCP Client — Connect to 100+ crypto intelligence tools",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  mirror-mcp health                              # Check server status
-  mirror-mcp list-skills                         # List all skills
-  mirror-mcp list-skills --category defi         # List DeFi skills
-  mirror-mcp search "risk"                        # Search for risk-related skills
-  mirror-mcp skill analyze_defi_protocol_risk    # Show skill details
-  mirror-mcp generate analyze_defi_protocol_risk # Generate a prompt
-  mirror-mcp permissions                          # Show your API key permissions
+  # New tool-based workflow
+  mirror-mcp tools                              # List all 100+ tools
+  mirror-mcp tools --category market            # List market data tools
+  mirror-mcp call get_symbol_price '{"symbol": "BTC"}'  # Execute tool
+  mirror-mcp call get_current_market_data       # Get all market data
+  
+  # Server status
+  mirror-mcp health
+  mirror-mcp permissions
+  
+  # Legacy skill workflow (still supported)
+  mirror-mcp list-skills                        # List skills/prompts
+  mirror-mcp list-skills --category defi        # Filter by category
+  mirror-mcp skill analyze_defi_protocol_risk  # Show skill details
+
+Tool Categories:
+  market        - Prices, volume, technical indicators
+  defi          - Protocols, yield, liquidity pools
+  security      - Token security, contract analysis
+  compliance    - Regulations, documents, risk
+  analytics     - Correlation, momentum, volatility
+  blockchain    - Wallet analysis, transactions
+  arbitrage     - Cross-DEX arbitrage opportunities
+  nft           - NFT collections, ownership, whales
+  alerts        - Price alerts, market signals
+  research      - Token research, whitepapers
         """
     )
     parser.add_argument(
@@ -246,51 +248,36 @@ Examples:
     health_parser = subparsers.add_parser("health", help="Check server health")
     health_parser.set_defaults(func=cmd_health)
     
-    # List skills command
-    list_parser = subparsers.add_parser("list-skills", help="List available skills")
-    list_parser.add_argument(
+    # Tools command (new)
+    tools_parser = subparsers.add_parser("tools", help="List executable tools")
+    tools_parser.add_argument(
         "--category",
-        help="Filter by category (e.g., defi_analysis, trading_workflows)"
+        help="Filter by category (e.g., market, defi, analytics)"
     )
-    list_parser.set_defaults(func=cmd_list_skills)
+    tools_parser.set_defaults(func=cmd_tools)
     
-    # Backwards compatibility: list-tools
-    list_tools_parser = subparsers.add_parser("list-tools", help="Alias for list-skills")
-    list_tools_parser.add_argument(
+    # Call tool command (new)
+    call_parser = subparsers.add_parser("call", help="Execute a tool via REST API")
+    call_parser.add_argument("tool_name", help="Name of the tool to execute")
+    call_parser.add_argument("arguments", nargs="?", help="JSON arguments for the tool")
+    call_parser.set_defaults(func=cmd_call)
+    
+    # Legacy list-skills (kept for compatibility)
+    list_parser = subparsers.add_parser("list-skills", help="List skills/prompts (legacy)")
+    list_parser.add_argument(
         "--category",
         help="Filter by category"
     )
-    list_tools_parser.set_defaults(func=cmd_list_skills)
+    list_parser.set_defaults(func=cmd_list_skills)
     
-    # Search command
-    search_parser = subparsers.add_parser("search", help="Search for skills")
-    search_parser.add_argument("query", help="Search query")
-    search_parser.set_defaults(func=cmd_search)
-    
-    # Skill details command
-    skill_parser = subparsers.add_parser("skill", help="Show skill details")
+    # Legacy skill command (kept for compatibility)
+    skill_parser = subparsers.add_parser("skill", help="Show skill details (legacy)")
     skill_parser.add_argument("skill_name", help="Name of the skill")
     skill_parser.set_defaults(func=cmd_skill)
-    
-    # Categories command
-    cat_parser = subparsers.add_parser("categories", help="List skill categories")
-    cat_parser.set_defaults(func=cmd_categories)
     
     # Permissions command
     perm_parser = subparsers.add_parser("permissions", help="Show API key permissions")
     perm_parser.set_defaults(func=cmd_permissions)
-    
-    # Call tool command
-    call_parser = subparsers.add_parser("call", help="Call a tool (returns metadata)")
-    call_parser.add_argument("tool_name", help="Name of the tool to call")
-    call_parser.add_argument("arguments", nargs="?", help="JSON arguments for the tool")
-    call_parser.set_defaults(func=cmd_call)
-    
-    # Generate prompt command
-    gen_parser = subparsers.add_parser("generate", help="Generate a prompt from a skill")
-    gen_parser.add_argument("skill_name", help="Name of the skill")
-    gen_parser.add_argument("--param", action="append", help="Add parameter (key=value)")
-    gen_parser.set_defaults(func=cmd_generate)
     
     args = parser.parse_args()
     

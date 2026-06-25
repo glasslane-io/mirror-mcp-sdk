@@ -9,11 +9,11 @@ Usage:
     
     client = MirrorMCPClient(api_key="your-api-key")
     
-    # List available tools/skills
+    # List available tools (100+ executable tools)
     tools = client.list_tools()
     
-    # Call a tool via REST API
-    result = client.call_tool("get_token_price", {"symbol": "BTC"})
+    # Execute a tool via REST API
+    result = client.execute_tool("get_symbol_price", {"symbol": "BTC"})
 """
 
 import os
@@ -428,12 +428,125 @@ class MirrorMCPClient:
     def __enter__(self):
         return self
     
+    def list_tools(self) -> List[Dict[str, Any]]:
+        """
+        List all executable tools available via REST API.
+        
+        Returns tools registered with the MCP server (100+ tools) including:
+        - Market data tools (get_symbol_price, get_top_movers, etc.)
+        - DeFi tools (query_defi_protocols, find_yield_opportunities, etc.)
+        - Security tools (analyze_token_security, etc.)
+        - Compliance tools (compliance_search_documents, etc.)
+        - Analytics tools (calculate_price_correlation, etc.)
+        - And many more...
+        
+        Returns:
+            List of tool dictionaries with name, category, description
+        """
+        response = self._client.get("/api/tools")
+        data = self._handle_response(response)
+        return data.get("tools", [])
+    
+    async def list_tools_async(self) -> List[Dict[str, Any]]:
+        """Async version of list_tools"""
+        client = self._get_async_client()
+        response = await client.get("/api/tools")
+        data = self._handle_response(response)
+        return data.get("tools", [])
+    
+    def execute_tool(
+        self,
+        tool_name: str,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute an MCP tool via REST API.
+        
+        Supports all 100+ tools registered on the server:
+        - get_symbol_price(symbol) - Get token price
+        - get_current_market_data() - Get market data
+        - get_top_movers() - Get top price movers
+        - query_defi_protocols() - Query DeFi protocols
+        - find_yield_opportunities() - Find yield farming
+        - calculate_price_correlation() - Price correlation
+        - analyze_token_security() - Security analysis
+        - compliance_search_documents() - Search regulations
+        - And 90+ more...
+        
+        Args:
+            tool_name: Tool name (e.g., "get_symbol_price")
+            params: Tool parameters as dictionary
+            timeout: Optional request timeout
+            
+        Returns:
+            Tool execution result with "status", "tool", "result" keys
+            
+        Example:
+            result = client.execute_tool("get_symbol_price", {"symbol": "BTC"})
+            price = result["result"][0]["price"]
+        """
+        response = self._client.post(
+            "/api/tools/execute",
+            json={"tool": tool_name, "params": params or {}},
+            timeout=timeout or self.timeout
+        )
+        return self._handle_response(response)
+    
+    async def execute_tool_async(
+        self,
+        tool_name: str,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Async version of execute_tool"""
+        client = self._get_async_client()
+        response = await client.post(
+            "/api/tools/execute",
+            json={"tool": tool_name, "params": params or {}},
+            timeout=timeout or self.timeout
+        )
+        return self._handle_response(response)
+    
+    def get_tool(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific tool by name.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Tool dictionary or None if not found
+        """
+        tools = self.list_tools()
+        for tool in tools:
+            if tool.get("name") == name:
+                return tool
+        return None
+    
+    def get_tools_by_category(self, category: str) -> List[Dict[str, Any]]:
+        """
+        Get tools in a specific category.
+        
+        Args:
+            category: Category name (e.g., "market", "defi", "analytics")
+            
+        Returns:
+            List of tool dictionaries
+        """
+        tools = self.list_tools()
+        return [t for t in tools if t.get("category") == category]
+
     def __exit__(self, *args):
         self.close()
 
 
 # Backwards compatibility aliases
-list_tools = MirrorMCPClient.list_skills
+list_tools = MirrorMCPClient.list_tools  # Now uses /api/tools, not /api/skills
+execute_tool = MirrorMCPClient.execute_tool  # Uses /api/tools/execute
+
+# Legacy aliases (deprecated but kept for compatibility)
+list_skills = MirrorMCPClient.list_skills
 call_tool = MirrorMCPClient.call_tool
 
 

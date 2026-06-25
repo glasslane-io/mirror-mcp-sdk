@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mirror-mcp"
-version = "4.1.4"
-description = "Mirror AI MCP Client SDK — Connect to 46+ crypto intelligence skills"
+version = "4.1.8"
+description = "Mirror AI MCP Client SDK — Connect to 100+ crypto intelligence tools"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"

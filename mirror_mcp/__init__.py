@@ -10,32 +10,31 @@ Quick start:
     # Create client (reads MIRROR_API_KEY from env if not provided)
     client = MirrorMCPClient(api_key="gl_mcp_...")
     
-    # List all 46+ skills
-    skills = client.list_skills()
+    # List all 100+ executable tools
+    tools = client.list_tools()
     
-    # Get skills by category
-    defi_skills = client.get_skills_by_category("defi_analysis")
+    # Execute a tool via REST API
+    result = client.execute_tool("get_symbol_price", {"symbol": "BTC"})
+    price = result["result"][0]["price"]
     
-    # Search for skills
-    results = client.search_skills("risk")
+    # List tools by category
+    market_tools = client.get_tools_by_category("market")
     
-    # Show skill details
-    skill = client.get_skill("analyze_defi_protocol_risk")
-    
-    # Generate a prompt
-    prompt = client.generate_prompt("analyze_defi_protocol_risk", protocol="Aave")
+    # Search for tools
+    tools = [t for t in tools if "price" in t["name"]]
 
 CLI Usage:
     export MIRROR_API_KEY="gl_mcp_..."
     mirror-mcp health
-    mirror-mcp list-skills
-    mirror-mcp skill analyze_defi_protocol_risk
+    mirror-mcp tools                    # List all tools
+    mirror-mcp tools --category market  # List market tools
+    mirror-mcp call get_symbol_price '{"symbol": "BTC"}'
     mirror-mcp permissions
 
 Get your API key at: https://mirror.glasslane.io
 """
 
-__version__ = "4.1.4"
+__version__ = "4.1.8"
 __author__ = "Glass Lane Pty Ltd"
 __email__ = "info@glasslane.io"
 
