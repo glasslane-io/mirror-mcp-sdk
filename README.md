@@ -138,8 +138,8 @@ except ToolExecutionError as e:
 
 ## Platform Integration
 
-### OpenClaw (Ruby)
-Ruby has native access to `mirror-mcp` via the SDK:
+### OpenClaw
+OpenClaw agents can access `mirror-mcp` via the Python SDK:
 
 ```python
 from mirror_mcp import MirrorMCPClient
@@ -180,7 +180,7 @@ result = client.execute_tool("get_symbol_price", {"symbol": "BTC"})
 ```
 
 ### Hermes (Local Agent)
-Hermes runs on your local LAN. Installation options:
+Hermes runs on a local machine in your network. Installation options:
 
 **Option 1: Direct Installation**
 ```bash
