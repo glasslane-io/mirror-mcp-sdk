@@ -34,7 +34,7 @@ CLI Usage:
 Get your API key at: https://mirror.glasslane.io
 """
 
-__version__ = "4.1.8"
+__version__ = "4.2.0"
 __author__ = "Glass Lane Pty Ltd"
 __email__ = "info@glasslane.io"
 
